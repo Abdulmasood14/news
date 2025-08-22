@@ -8,7 +8,6 @@ import re
 # Page configuration
 st.set_page_config(
     page_title="Company Scraper Dashboard",
-    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
