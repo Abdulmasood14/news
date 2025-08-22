@@ -130,42 +130,23 @@ class CompanyDataProcessor:
             # GitHub API URL to get contents of the directory
             api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.csv_directory}"
             
-            st.write(f"🔍 **Debug Info:** Checking GitHub URL: {api_url}")
-            
             response = requests.get(api_url)
-            st.write(f"📡 **API Response Status:** {response.status_code}")
-            
             if response.status_code == 200:
                 files = response.json()
-                st.write(f"📁 **Files Found:** {len(files)} files")
-                
-                # Show all files found
-                for file_info in files:
-                    st.write(f"   - File: {file_info['name']} (Type: {file_info.get('type', 'unknown')})")
-                
                 dates = []
                 
                 for file_info in files:
                     if file_info['name'].endswith('.csv'):
-                        st.write(f"🔍 **Processing CSV:** {file_info['name']}")
                         try:
                             date_from_file = self.extract_date_from_filename(file_info['name'])
                             if date_from_file:
-                                st.write(f"   ✅ **Date extracted:** {date_from_file}")
                                 dates.append(date_from_file)
-                            else:
-                                st.write(f"   ❌ **No date extracted from:** {file_info['name']}")
                         except Exception as e:
                             st.error(f"Error processing {file_info['name']}: {str(e)}")
                 
                 self.available_dates = sorted(list(set(dates)), reverse=True)  # Most recent first
-                st.write(f"📅 **Final Available Dates:** {[d.strftime('%d.%m.%Y') for d in self.available_dates]}")
             else:
                 st.error(f"Failed to access GitHub repository: {response.status_code}")
-                if response.status_code == 404:
-                    st.error("Repository or directory not found. Please check:")
-                    st.error(f"- Repository: {self.github_repo}")
-                    st.error(f"- Directory: {self.csv_directory}")
                 self.available_dates = []
                 
         except Exception as e:
