@@ -6,7 +6,6 @@ from datetime import datetime, date
 import re
 import requests
 from io import StringIO
-import time
 
 # Page configuration
 st.set_page_config(
@@ -88,14 +87,6 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
-    .debug-info {
-        background: #f1f3f4;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 12px;
-    }
-    
     /* Style all Streamlit buttons to look like gradient cards */
     div[data-testid="stButton"] > button[kind="primary"] {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ff6b9d 100%) !important;
@@ -131,47 +122,32 @@ class CompanyDataProcessor:
         self.csv_directory = csv_directory
         self.companies_data = {}
         self.available_dates = []
-        self.branch = None  # Will be determined automatically
         self.load_available_dates()
     
     def load_available_dates(self):
         """Load all available dates from GitHub CSV files"""
         try:
-            # Try both main and master branches
-            branches_to_try = ['main', 'master']
+            # GitHub API URL to get contents of the directory
+            api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.csv_directory}"
             
-            for branch in branches_to_try:
-                # GitHub API URL to get contents of the directory
-                api_url = f"https://api.github.com/repos/{self.github_repo}/contents/{self.csv_directory}?ref={branch}"
+            response = requests.get(api_url)
+            if response.status_code == 200:
+                files = response.json()
+                dates = []
                 
-                response = requests.get(api_url, timeout=10)
-                if response.status_code == 200:
-                    self.branch = branch  # Store the working branch
-                    files = response.json()
-                    dates = []
-                    
-                    for file_info in files:
-                        if file_info['name'].endswith('.csv'):
-                            try:
-                                date_from_file = self.extract_date_from_filename(file_info['name'])
-                                if date_from_file:
-                                    dates.append(date_from_file)
-                            except Exception as e:
-                                st.error(f"Error processing {file_info['name']}: {str(e)}")
-                    
-                    self.available_dates = sorted(list(set(dates)), reverse=True)  # Most recent first
-                    st.success(f"✅ Connected to {branch} branch - Found {len(self.available_dates)} CSV files")
-                    return  # Success, exit the loop
-                    
-                elif response.status_code == 404:
-                    continue  # Try next branch
-                else:
-                    st.warning(f"API response for {branch} branch: {response.status_code}")
-                    continue
-            
-            # If we reach here, no branch worked
-            st.error(f"Failed to access GitHub repository branches. Please check if the repository exists and is public.")
-            self.available_dates = []
+                for file_info in files:
+                    if file_info['name'].endswith('.csv'):
+                        try:
+                            date_from_file = self.extract_date_from_filename(file_info['name'])
+                            if date_from_file:
+                                dates.append(date_from_file)
+                        except Exception as e:
+                            st.error(f"Error processing {file_info['name']}: {str(e)}")
+                
+                self.available_dates = sorted(list(set(dates)), reverse=True)  # Most recent first
+            else:
+                st.error(f"Failed to access GitHub repository: {response.status_code}")
+                self.available_dates = []
                 
         except Exception as e:
             st.error(f"Error connecting to GitHub: {str(e)}")
@@ -197,37 +173,14 @@ class CompanyDataProcessor:
         if not selected_date:
             return
         
-        # Use the branch that was determined to work
-        if not self.branch:
-            st.error("No working branch found. Please check repository access.")
-            return
-        
         # Construct GitHub raw URL for the CSV file
         date_str = selected_date.strftime("%d.%m.%Y")
         csv_filename = f"{date_str}.csv"
-        
-        # Add cache-busting parameter with current timestamp
-        cache_buster = int(time.time())
-        github_raw_url = f"https://raw.githubusercontent.com/{self.github_repo}/{self.branch}/{self.csv_directory}/{csv_filename}?v={cache_buster}"
+        github_raw_url = f"https://raw.githubusercontent.com/{self.github_repo}/master/{self.csv_directory}/{csv_filename}"
         
         try:
-            # Add headers to avoid caching
-            headers = {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            # Show debug info
-            with st.expander("🔍 Debug Info", expanded=False):
-                st.write(f"**Branch:** {self.branch}")
-                st.write(f"**URL:** {github_raw_url}")
-                st.write(f"**Timestamp:** {datetime.now().strftime('%H:%M:%S')}")
-            
             # Download CSV from GitHub
-            response = requests.get(github_raw_url, headers=headers, timeout=15)
-            
+            response = requests.get(github_raw_url)
             if response.status_code == 200:
                 # Read CSV content
                 csv_content = StringIO(response.text)
@@ -237,7 +190,6 @@ class CompanyDataProcessor:
                 required_columns = ['Company_Name', 'Extracted_Links', 'Extracted_Text']
                 if not all(col in df.columns for col in required_columns):
                     st.error(f"CSV file must contain columns: {required_columns}")
-                    st.error(f"Found columns: {list(df.columns)}")
                     return
                 
                 # Process the data
@@ -246,7 +198,7 @@ class CompanyDataProcessor:
                 for index, row in df.iterrows():
                     company_name = str(row['Company_Name']).strip().upper()
                     
-                    if company_name and company_name != 'NAN' and company_name.lower() != 'nan':
+                    if company_name and company_name != 'NAN':
                         companies_data[company_name] = {
                             'company_name': company_name,
                             'extracted_links': str(row['Extracted_Links']) if pd.notna(row['Extracted_Links']) else '',
@@ -257,28 +209,12 @@ class CompanyDataProcessor:
                         }
                 
                 self.companies_data = companies_data
-                
-                if companies_data:
-                    st.success(f"✅ Successfully loaded {len(companies_data)} companies from {self.branch} branch")
-                else:
-                    st.warning("⚠️ No valid company data found in the CSV file")
-                    
-            elif response.status_code == 404:
-                st.error(f"❌ CSV file {csv_filename} not found on {self.branch} branch")
-                self.companies_data = {}
             else:
-                st.error(f"❌ Failed to download CSV file for {date_str} (Status: {response.status_code})")
-                st.error(f"Response: {response.text[:200]}...")
+                st.error(f"Failed to download CSV file for {date_str} from GitHub (Status: {response.status_code})")
                 self.companies_data = {}
                 
-        except requests.exceptions.Timeout:
-            st.error("⏱️ Request timed out. Please try again.")
-            self.companies_data = {}
-        except requests.exceptions.RequestException as e:
-            st.error(f"🌐 Network error: {str(e)}")
-            self.companies_data = {}
         except Exception as e:
-            st.error(f"💥 Error loading data for {date_str}: {str(e)}")
+            st.error(f"Error loading data for {date_str}: {str(e)}")
             self.companies_data = {}
     
     def get_companies_list(self):
@@ -323,23 +259,12 @@ def main():
         st.session_state.page = "Dashboard"
     if 'selected_date' not in st.session_state:
         st.session_state.selected_date = None
-    if 'processor' not in st.session_state:
-        st.session_state.processor = None
     
-    # Initialize data processor (with caching to avoid repeated API calls)
-    if st.session_state.processor is None:
-        with st.spinner("🔄 Connecting to GitHub repository..."):
-            st.session_state.processor = CompanyDataProcessor()
-    
-    processor = st.session_state.processor
+    # Initialize data processor
+    processor = CompanyDataProcessor()
     
     # Sidebar navigation
     st.sidebar.title("Navigation")
-    
-    # Add refresh button in sidebar
-    if st.sidebar.button("🔄 Refresh Repository Data"):
-        st.session_state.processor = None
-        st.rerun()
     
     # Handle button clicks from dashboard
     if st.session_state.get('selected_company'):
@@ -358,14 +283,6 @@ def main():
 def show_dashboard(processor):
     """Display main dashboard with company cards"""
     st.markdown("<h1 class='main-header'>Company Data Scraper Dashboard</h1>", unsafe_allow_html=True)
-    
-    # Add main refresh button
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        if st.button("🔄 Refresh Data", help="Force reload data from GitHub"):
-            # Clear cached data
-            processor.companies_data = {}
-            st.rerun()
     
     # Calendar Section
     st.markdown("<div class='calendar-section'>", unsafe_allow_html=True)
@@ -425,8 +342,7 @@ def show_dashboard(processor):
     
     # Load data for selected date and show company cards
     if st.session_state.selected_date:
-        with st.spinner("📥 Loading company data..."):
-            processor.load_company_data_for_date(st.session_state.selected_date)
+        processor.load_company_data_for_date(st.session_state.selected_date)
         
         # Show current date info
         st.markdown(f"<div class='date-info'>Showing data for: {st.session_state.selected_date.strftime('%d %B %Y (%A)')}</div>", 
@@ -449,25 +365,12 @@ def show_dashboard(processor):
         # Company cards
         st.markdown("<h2 class='section-header'>Company Data Cards</h2>", unsafe_allow_html=True)
         
-        # Search functionality
-        search_term = st.text_input("🔍 Search companies:", placeholder="Type company name...")
-        
-        # Filter companies based on search
-        if search_term:
-            filtered_companies = [comp for comp in companies if search_term.lower() in comp.lower()]
-        else:
-            filtered_companies = companies
-        
-        if not filtered_companies:
-            st.info("No companies match your search criteria.")
-            return
-        
         # Create cards in grid layout (2 columns)
         cols_per_row = 2
-        for i in range(0, len(filtered_companies), cols_per_row):
+        for i in range(0, len(companies), cols_per_row):
             cols = st.columns(cols_per_row)
             
-            for j, company in enumerate(filtered_companies[i:i+cols_per_row]):
+            for j, company in enumerate(companies[i:i+cols_per_row]):
                 with cols[j]:
                     # Create a button with the company name
                     if st.button(
@@ -478,8 +381,6 @@ def show_dashboard(processor):
                     ):
                         st.session_state.selected_company = company
                         st.rerun()
-    else:
-        st.info("👆 Please select a date to view company data.")
 
 def show_company_details(processor):
     """Display detailed view for selected company"""
@@ -492,8 +393,7 @@ def show_company_details(processor):
         return
     
     # Load data for current date
-    with st.spinner("📥 Loading company data..."):
-        processor.load_company_data_for_date(st.session_state.selected_date)
+    processor.load_company_data_for_date(st.session_state.selected_date)
     
     companies = processor.get_companies_list()
     if not companies:
@@ -551,12 +451,12 @@ def show_company_details(processor):
             with st.expander("View All Links", expanded=True):
                 for i, link in enumerate(links_list, 1):
                     if link.startswith('http'):
-                        st.markdown(f"**{i}.** [{link}]({link})")
+                        st.markdown(f"[{link}]({link})")
                     else:
-                        st.write(f"**{i}.** {link}")
+                        st.write(f"{link}")
             
             # Download links
-            if st.button("📥 Download Links as Text"):
+            if st.button("Download Links as Text"):
                 st.download_button(
                     label="Download Links",
                     data='\n'.join(links_list),
@@ -574,23 +474,12 @@ def show_company_details(processor):
     text_content = data.get('extracted_text', '')
     if text_content and text_content.strip() and text_content.lower() != 'nan':
         # Text search
-        text_search = st.text_input("🔍 Search in text content", placeholder="Enter keyword to search...")
+        text_search = st.text_input("Search in text content", placeholder="Enter keyword to search...")
         
         display_text = text_content
-        if text_search and text_search.lower() in text_content.lower():
+        if text_search and text_search in text_content.lower():
             # Simple highlighting
             display_text = text_content.replace(text_search, f"**{text_search}**")
-            st.success(f"Found keyword '{text_search}' in the content!")
-        
-        # Text statistics
-        word_count = len(text_content.split())
-        char_count = len(text_content)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Word Count", word_count)
-        with col2:
-            st.metric("Character Count", char_count)
         
         # Show preview
         st.text_area("Content Preview", text_content[:500] + "..." if len(text_content) > 500 else text_content, height=100)
@@ -600,7 +489,7 @@ def show_company_details(processor):
             st.markdown(display_text)
         
         # Download text content
-        if st.button("📥 Download Text Content"):
+        if st.button("Download Text Content"):
             st.download_button(
                 label="Download Text",
                 data=text_content,
@@ -613,7 +502,7 @@ def show_company_details(processor):
     # Raw data section
     st.markdown("<h3 class='section-header'>Raw Data</h3>", unsafe_allow_html=True)
     
-    if st.button("🔍 Show Raw Data"):
+    if st.button("Show Raw Data"):
         st.json({
             'company_name': data['company_name'],
             'row_number': data['row_number'],
