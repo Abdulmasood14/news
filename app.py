@@ -272,7 +272,7 @@ def show_dashboard(processor):
     
     # Calendar Section
     st.markdown("<div class='calendar-section'>", unsafe_allow_html=True)
-    st.markdown("### 📅 Select Date")
+    st.markdown("### Select Date")
     
     available_dates = processor.get_available_dates()
     
@@ -287,34 +287,46 @@ def show_dashboard(processor):
     with col1:
         # Show available dates for selection
         if available_dates:
-            default_date = st.session_state.selected_date if st.session_state.selected_date in available_dates else available_dates[0]
+            # Add a default "Select a date" option
+            date_options = ["Select a date..."] + available_dates
             
-            selected_date = st.selectbox(
+            # Find current selection index
+            if st.session_state.selected_date and st.session_state.selected_date in available_dates:
+                current_index = available_dates.index(st.session_state.selected_date) + 1
+            else:
+                current_index = 0
+            
+            selected_option = st.selectbox(
                 "Available dates:",
-                available_dates,
-                index=available_dates.index(default_date) if default_date in available_dates else 0,
-                format_func=lambda x: x.strftime("%d %B %Y (%A)")
+                date_options,
+                index=current_index,
+                format_func=lambda x: x.strftime("%d %B %Y (%A)") if x != "Select a date..." else x
             )
             
-            st.session_state.selected_date = selected_date
+            # Update session state only if a real date is selected
+            if selected_option != "Select a date...":
+                st.session_state.selected_date = selected_option
+            else:
+                st.session_state.selected_date = None
     
     with col2:
         # Calendar picker (alternative selection)
-        calendar_date = st.date_input(
-            "Or pick a date:",
-            value=st.session_state.selected_date if st.session_state.selected_date else available_dates[0],
-            min_value=min(available_dates) if available_dates else date.today(),
-            max_value=max(available_dates) if available_dates else date.today()
-        )
-        
-        if calendar_date in available_dates:
-            st.session_state.selected_date = calendar_date
-        elif calendar_date not in available_dates:
-            st.warning(f"No data available for {calendar_date.strftime('%d.%m.%Y')}")
+        if available_dates:
+            calendar_date = st.date_input(
+                "Or pick a date:",
+                value=st.session_state.selected_date if st.session_state.selected_date else available_dates[0],
+                min_value=min(available_dates) if available_dates else date.today(),
+                max_value=max(available_dates) if available_dates else date.today()
+            )
+            
+            if calendar_date in available_dates:
+                st.session_state.selected_date = calendar_date
+            elif calendar_date not in available_dates:
+                st.warning(f"No data available for {calendar_date.strftime('%d.%m.%Y')}")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Load data for selected date
+    # Load data for selected date and show company cards
     if st.session_state.selected_date:
         processor.load_company_data_for_date(st.session_state.selected_date)
         
@@ -322,27 +334,22 @@ def show_dashboard(processor):
         st.markdown(f"<div class='date-info'>Showing data for: {st.session_state.selected_date.strftime('%d %B %Y (%A)')}</div>", 
                    unsafe_allow_html=True)
         
-        # Summary statistics
-        stats = processor.get_summary_stats()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Companies", stats['total_companies'])
-        with col2:
-            st.metric("Total Links", stats['total_links'])
-        with col3:
-            st.metric("Total Text Length", f"{stats['total_text_length']:,} chars")
-        
-        st.markdown("---")
-        
-        # Company cards
-        st.markdown("<h2 class='section-header'>Company Data Cards</h2>", unsafe_allow_html=True)
-        
+        # Get companies data
         companies = processor.get_companies_list()
         
         if not companies:
             st.info(f"No company data found for {st.session_state.selected_date.strftime('%d.%m.%Y')}")
             return
+        
+        # Show only total companies metric
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.metric("Total Companies", len(companies))
+        
+        st.markdown("---")
+        
+        # Company cards
+        st.markdown("<h2 class='section-header'>Company Data Cards</h2>", unsafe_allow_html=True)
         
         # Create cards in grid layout (2 columns)
         cols_per_row = 2
@@ -410,13 +417,10 @@ def show_company_details(processor):
     # Summary information
     st.markdown("<h3 class='section-header'>Summary Information</h3>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Company Name", data['company_name'])
+    # Center the single metric
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.metric("Row Number", data['row_number'])
-    with col3:
-        st.metric("Extraction Date", data['extraction_date'].strftime('%d.%m.%Y'))
+        st.metric("Company Name", data['company_name'])
     
     # Extracted Links Section
     st.markdown("<h3 class='section-header'>Extracted Links</h3>", unsafe_allow_html=True)
@@ -433,9 +437,9 @@ def show_company_details(processor):
             with st.expander("View All Links", expanded=True):
                 for i, link in enumerate(links_list, 1):
                     if link.startswith('http'):
-                        st.markdown(f"{i}. [{link}]({link})")
+                        st.markdown(f"[{link}]({link})")
                     else:
-                        st.write(f"{i}. {link}")
+                        st.write(f"{link}")
             
             # Download links
             if st.button("Download Links as Text"):
