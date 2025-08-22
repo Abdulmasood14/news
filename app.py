@@ -288,30 +288,42 @@ def show_dashboard(processor):
     with col1:
         # Show available dates for selection
         if available_dates:
-            default_date = st.session_state.selected_date if st.session_state.selected_date in available_dates else available_dates[0]
+            # Add a default "Select a date" option
+            date_options = ["Select a date..."] + available_dates
             
-            selected_date = st.selectbox(
+            # Find current selection index
+            if st.session_state.selected_date and st.session_state.selected_date in available_dates:
+                current_index = available_dates.index(st.session_state.selected_date) + 1
+            else:
+                current_index = 0
+            
+            selected_option = st.selectbox(
                 "Available dates:",
-                available_dates,
-                index=available_dates.index(default_date) if default_date in available_dates else 0,
-                format_func=lambda x: x.strftime("%d %B %Y (%A)")
+                date_options,
+                index=current_index,
+                format_func=lambda x: x.strftime("%d %B %Y (%A)") if x != "Select a date..." else x
             )
             
-            st.session_state.selected_date = selected_date
+            # Update session state only if a real date is selected
+            if selected_option != "Select a date...":
+                st.session_state.selected_date = selected_option
+            else:
+                st.session_state.selected_date = None
     
     with col2:
         # Calendar picker (alternative selection)
-        calendar_date = st.date_input(
-            "Or pick a date:",
-            value=st.session_state.selected_date if st.session_state.selected_date else available_dates[0],
-            min_value=min(available_dates) if available_dates else date.today(),
-            max_value=max(available_dates) if available_dates else date.today()
-        )
-        
-        if calendar_date in available_dates:
-            st.session_state.selected_date = calendar_date
-        elif calendar_date not in available_dates:
-            st.warning(f"No data available for {calendar_date.strftime('%d.%m.%Y')}")
+        if available_dates:
+            calendar_date = st.date_input(
+                "Or pick a date:",
+                value=st.session_state.selected_date if st.session_state.selected_date else available_dates[0],
+                min_value=min(available_dates) if available_dates else date.today(),
+                max_value=max(available_dates) if available_dates else date.today()
+            )
+            
+            if calendar_date in available_dates:
+                st.session_state.selected_date = calendar_date
+            elif calendar_date not in available_dates:
+                st.warning(f"No data available for {calendar_date.strftime('%d.%m.%Y')}")
     
     st.markdown("</div>", unsafe_allow_html=True)
     
