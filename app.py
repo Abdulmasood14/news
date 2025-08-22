@@ -9,7 +9,7 @@ from io import StringIO
 
 # Page configuration
 st.set_page_config(
-    page_title="Company Dashboard",
+    page_title="News Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
