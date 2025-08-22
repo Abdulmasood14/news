@@ -418,13 +418,10 @@ def show_company_details(processor):
     # Summary information
     st.markdown("<h3 class='section-header'>Summary Information</h3>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Company Name", data['company_name'])
+    # Center the single metric
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        st.metric("Row Number", data['row_number'])
-    with col3:
-        st.metric("Extraction Date", data['extraction_date'].strftime('%d.%m.%Y'))
+        st.metric("Company Name", data['company_name'])
     
     # Extracted Links Section
     st.markdown("<h3 class='section-header'>Extracted Links</h3>", unsafe_allow_html=True)
@@ -441,9 +438,9 @@ def show_company_details(processor):
             with st.expander("View All Links", expanded=True):
                 for i, link in enumerate(links_list, 1):
                     if link.startswith('http'):
-                        st.markdown(f"{i}. [{link}]({link})")
+                        st.markdown(f"[{link}]({link})")
                     else:
-                        st.write(f"{i}. {link}")
+                        st.write(f"{link}")
             
             # Download links
             if st.button("Download Links as Text"):
