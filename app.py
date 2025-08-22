@@ -9,7 +9,7 @@ from io import StringIO
 
 # Page configuration
 st.set_page_config(
-    page_title="Company Scraper Dashboard",
+    page_title="Company Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
