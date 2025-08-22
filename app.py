@@ -8,6 +8,7 @@ import re
 # Page configuration
 st.set_page_config(
     page_title="Company Scraper Dashboard",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -314,7 +315,7 @@ def show_dashboard(processor):
     
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Load data for selected date
+    # Load data for selected date and show company cards
     if st.session_state.selected_date:
         processor.load_company_data_for_date(st.session_state.selected_date)
         
@@ -322,27 +323,22 @@ def show_dashboard(processor):
         st.markdown(f"<div class='date-info'>Showing data for: {st.session_state.selected_date.strftime('%d %B %Y (%A)')}</div>", 
                    unsafe_allow_html=True)
         
-        # Summary statistics
-        stats = processor.get_summary_stats()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Companies", stats['total_companies'])
-        with col2:
-            st.metric("Total Links", stats['total_links'])
-        with col3:
-            st.metric("Total Text Length", f"{stats['total_text_length']:,} chars")
-        
-        st.markdown("---")
-        
-        # Company cards
-        st.markdown("<h2 class='section-header'>Company Data Cards</h2>", unsafe_allow_html=True)
-        
+        # Get companies data
         companies = processor.get_companies_list()
         
         if not companies:
             st.info(f"No company data found for {st.session_state.selected_date.strftime('%d.%m.%Y')}")
             return
+        
+        # Show only total companies metric
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.metric("Total Companies", len(companies))
+        
+        st.markdown("---")
+        
+        # Company cards
+        st.markdown("<h2 class='section-header'>Company Data Cards</h2>", unsafe_allow_html=True)
         
         # Create cards in grid layout (2 columns)
         cols_per_row = 2
