@@ -282,7 +282,7 @@ def main():
 
 def show_dashboard(processor):
     """Display main dashboard with company cards"""
-    st.markdown("<h1 class='main-header'>Company Data Scraper Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>Company News Dashboard</h1>", unsafe_allow_html=True)
     
     # Calendar Section
     st.markdown("<div class='calendar-section'>", unsafe_allow_html=True)
