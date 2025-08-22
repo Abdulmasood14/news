@@ -10,7 +10,7 @@ import time
 
 # Page configuration
 st.set_page_config(
-    page_title="News Dashboard",
+    page_title="Company Dashboard",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -357,7 +357,7 @@ def main():
 
 def show_dashboard(processor):
     """Display main dashboard with company cards"""
-    st.markdown("<h1 class='main-header'>News Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header'>Company Data Scraper Dashboard</h1>", unsafe_allow_html=True)
     
     # Add main refresh button
     col1, col2, col3 = st.columns([1, 1, 1])
