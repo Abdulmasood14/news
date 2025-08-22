@@ -272,7 +272,7 @@ def show_dashboard(processor):
     
     # Calendar Section
     st.markdown("<div class='calendar-section'>", unsafe_allow_html=True)
-    st.markdown("### 📅 Select Date")
+    st.markdown("### Select Date")
     
     available_dates = processor.get_available_dates()
     
